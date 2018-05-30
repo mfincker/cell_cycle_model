@@ -1,0 +1,297 @@
+---
+title: "FACS_histogram_extraction"
+author: "Maeva"
+date: "5/29/2018"
+output: pdf_document
+params:
+  experiment:
+    value: '/Users/maeva/Research/FACS/carmen-20171121/'
+  sample_ctrl:
+    value: 5
+  sample_pico:
+    value: 6
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(stringr)
+library(tidyverse)
+library(ggcyto)
+library(flowCore)
+library(flowViz)
+library(openCyto)
+```
+
+
+# Script variables and metadata
+
+```{r, echo=FALSE, message=FALSE}
+wd <- params$experiment
+
+d <- str_match(wd, "\\d+")
+
+metadata <- 
+  file.path(wd, "metadata.tsv") %>% 
+  read_tsv()
+
+meta <-     
+    metadata %>% 
+    dplyr::filter(sample_num == params$sample_pico)
+
+base_name <- str_c(wd, meta$reactor, '_rep' , meta$rep, '_sample', as.character(meta$sample_num))
+```
+
+* Experiment: `r params$experiment`
+* Reactor: `r meta$reactor`
+* Replicate: `r meta$rep`
+* Sample tube: `r meta$sample_num`
+
+# Log-transform of FSC and SSC
+
+```{r}
+fs <- read.flowSet(path = wd,
+                   pattern = ".fcs")
+
+log10trans <- logTransform("log10 transform")
+
+log10transList <- transformList(c("FSC", "SSC"), log10trans)
+
+```
+
+# Sample frames and gating set creation
+
+```{r}
+sample_ctrl <- params$sample_ctrl
+sample_pico <- params$sample_pico
+
+frame_ctrl <- 
+    metadata %>% 
+    dplyr::filter(sample_num == sample_ctrl) %>% 
+    .$fs_row
+
+frame_pico <- 
+    metadata %>% 
+    dplyr::filter(sample_num == sample_pico) %>% 
+    .$fs_row
+    
+fs_ <- fs[c(frame_ctrl, frame_pico)] %>% 
+  transform(log10transList)
+  
+frame_ctrl <-  1
+frame_pico <- 2
+
+gs_ <- 
+  fs_ %>% 
+  transform(log10transList) %>% 
+  GatingSet()
+
+```
+
+# FSC density - noise gate
+
+```{r, echo=FALSE, message=FALSE}
+
+noise_gate <- fsApply(getData(gs_),
+                       function(fr) {
+                         openCyto:::.tailgate(fr, channels = c("FSC"), tol = 0.05, side = "left")
+                       })
+
+p1 <- 
+  getData(gs_[[2]]) %>% 
+  ggplot(aes(FSC)) +
+  geom_density(fill = "steelblue", alpha = 0.7) +
+  geom_gate(noise_gate[[2]]) +
+  theme_classic()
+
+p2 <- 
+  getData(gs_[[2]]) %>% 
+  ggplot(aes(FSC, SSC)) +
+  geom_hex(bins = 170, show.legend = F) +
+  geom_gate(noise_gate[[2]]) +
+  scale_fill_gradientn(colours = rev(RColorBrewer::brewer.pal(11, "Spectral")), trans = "sqrt") +
+  theme_classic()
+
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+
+add(gs_, noise_gate, 
+      parent = "root", 
+      name = "cells")
+  
+recompute(gs_)
+
+```
+
+# Remove large cells
+
+```{r, echo=FALSE, message=FALSE}
+largeCells_gate <-  fsApply(getData(gs_),
+                            function(fr) {
+                              openCyto:::.tailgate(fr, channels = "FSC", tol = 0.2)
+                            })
+
+smallCells_gate <-  fsApply(getData(gs_),
+                              function(fr) {
+                                openCyto:::.tailgate(fr, channels = "FSC", tol = 0.2, positive = FALSE)
+                              })
+
+p1 <- 
+  getData(gs_[[2]], "cells") %>%
+  ggplot(aes(FSC)) +
+  geom_density(fill = "steelblue", alpha = 0.7) +
+  geom_gate(smallCells_gate[[2]]) +
+  theme_classic()
+
+p2 <- 
+  getData(gs_[[2]], "cells") %>%
+  ggplot(aes(FSC, SSC)) +
+  geom_hex(bins = 170, show.legend = F) +
+  geom_gate(smallCells_gate[[2]]) +
+  scale_fill_gradientn(colours = rev(RColorBrewer::brewer.pal(11, "Spectral")), trans = "sqrt") +
+  theme_classic()
+
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+
+add(gs_,
+      largeCells_gate,
+      parent = "cells",
+      name = "large cells")
+
+add(gs_,
+      smallCells_gate,
+      parent = "cells",
+      name = "small cells")
+
+recompute(gs_)
+```
+
+# Remove events with off scale pico signal
+
+```{r, echo=FALSE, message=FALSE}
+max_range <-
+  getData(gs_[[2]], "small cells")@parameters@data %>%
+  as_tibble() %>%
+  dplyr::filter(name == "*525/50 [488]") %>%
+  .$maxRange
+
+
+dhc_gate <-  openCyto:::.mindensity(getData(gs_[[2]], "small cells"),
+                               channels = "*525/50 [488]",
+                               positive = FALSE,
+                               gate_range = c(max_range / 2, max_range))
+
+p1 <- 
+  getData(gs_[[2]], "small cells") %>%
+  ggplot(aes(`*525/50 [488]`)) +
+  geom_density(fill = "steelblue", alpha = 0.7) +
+  geom_gate(dhc_gate) +
+  theme_classic()
+
+p2 <- 
+  getData(gs_[[2]], "small cells") %>%
+  ggplot(aes(FSC, `*525/50 [488]`)) +
+  geom_hex(bins = 170, show.legend = F) +
+  geom_gate(dhc_gate) +
+  scale_fill_gradientn(colours = rev(RColorBrewer::brewer.pal(11, "Spectral")), trans = "sqrt") +
+  theme_classic()
+
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+
+add(gs_,
+      dhc_gate,
+      parent = "small cells",
+      name = "dhc cells")
+
+recompute(gs_)
+```
+
+# Noise level for pico signal
+
+```{r, echo=FALSE, message=FALSE}
+# pico_plus_gate <- openCyto:::.quantileGate(getData(gs_[[1]], "dhc cells"),
+#                                channels = "*525/50 [488]",
+#                                probs = 0.995)
+
+pico_plus_gate <-  openCyto:::.mindensity(getData(gs_[[2]], "dhc cells"),
+                               channels = "*525/50 [488]",
+                               positive = TRUE)
+
+p1 <- 
+  getData(gs_[[2]], "dhc cells") %>%
+  ggplot(aes(`*525/50 [488]`)) +
+  geom_density(fill = "steelblue", alpha = 0.7) +
+  geom_gate(pico_plus_gate) +
+  theme_classic()
+
+p2 <- 
+  getData(gs_[[2]], "dhc cells") %>%
+  ggplot(aes(FSC, `*525/50 [488]`)) +
+  geom_hex(bins = 170, show.legend = F) +
+  geom_gate(pico_plus_gate) +
+  scale_fill_gradientn(colours = rev(RColorBrewer::brewer.pal(11, "Spectral")), trans = "sqrt") +
+  theme_classic()
+
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+
+add(gs_,
+    pico_plus_gate,
+    parent = "dhc cells",
+    name = "pico+")
+
+recompute(gs_)
+
+```
+
+# Clean density - 95% confidence interval
+
+```{r}
+data <- 
+  getData(gs_[[2]], "pico+") %>% 
+  exprs() %>% 
+  as_tibble() %>% 
+  select(FSC, pico = `*525/50 [488]`)
+
+ci95 <- 
+  ci2d(data$FSC, data$pico, method = "bkde2D", show = "none", ci.levels = c(0.95))$contours$`0.95` %>% 
+  as_data_frame() %>% 
+  rename(FSC = x, pico = y)
+
+
+filtered_data <- 
+  data %>% 
+  mutate(keep = sp::point.in.polygon(FSC, pico, ci95$FSC, ci95$pico))
+
+filtered_data %>% 
+  sample_frac(0.25) %>% 
+  ggplot(aes(FSC, pico)) +
+  geom_point(aes(color = as.factor(keep)), size = 0.5) +
+  geom_point(data = ci95, color = "red")
+```
+
+# Extract histogram
+
+Saved at: `r str_c(base_name, "_histo.tsv")`.
+
+```{r}
+p <- 
+  filtered_data %>% 
+  dplyr::filter(keep == T) %>% 
+  select(pico) %>% 
+  ggplot(aes(pico)) +
+  geom_histogram(bins = 256)
+
+p
+
+r <- 
+  ggplot_build(p)$data[[1]] %>% 
+  select(count, x) %>% 
+  rename(pico = x) %>% 
+  mutate(n = row_number())
+  
+r %>% 
+  write_tsv(str_c(base_name, "_histo.tsv"))
+
+```
+
+
+
