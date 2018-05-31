@@ -8,6 +8,8 @@ params:
     value: '/Users/maeva/Research/FACS/carmen-20180410'
   sample_pico:
     value: 6
+  sample_frame:
+    value: NULL
 ---
 
 ```{r setup, include=FALSE}
@@ -39,7 +41,7 @@ metadata_full <-
 
 metadata <- 
   metadata_full %>% 
-  dplyr::filter(sample_num == params$sample_pico)
+  dplyr::filter(fs_row == params$sample_frame)
 
 base_name <- file.path(wd, "analysis", metadata$name)
 ```
@@ -78,11 +80,15 @@ log10transList <- transformList(c("FSC", "SSC"), log10trans)
 
 sample_pico <- params$sample_pico
 
-
+# renumber the sample frame because we removed the frames
+# we are not analyzing
 frame_pico <- 
-    metadata %>% 
-    dplyr::filter(sample_num == sample_pico) %>% 
-    .$fs_row
+  metadata_full %>% 
+  dplyr::filter(analyse == 1) %>% 
+  mutate(new_fs_row = row_number()) %>% 
+  dplyr::filter(fs_row == params$sample_frame) %>% 
+  .$new_fs_row
+
 
 gs <- 
   fs %>% 
