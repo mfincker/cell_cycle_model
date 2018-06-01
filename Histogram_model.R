@@ -97,7 +97,11 @@ DNAhisto_currentGeneration <-
     #       - filename: output file name (default: '')
     
     if ( B + C > tau) {
-      stop("DNA replication didn't start in current generation.")
+      print(str_c("B: ", B))
+      print(str_c("C: ", C))
+      print("DNA replication didn't start in current generation.")
+      return(tribble(~B, ~C, ~Std_dev, ~Std_dev_var, ~Deviation,
+                      B,  C,  std_dev,  std_dev_var,  NA))
     }
     
     c1_peak <- getC1(histo) 
@@ -178,10 +182,10 @@ tau <-
 
 ### Parameter grid search
 
-percent_B <- seq(0, 1, 0.1)
-percent_C <- seq(0, 1, 0.1)
-std_dev_values <- seq(5, 20, 1)
-std_dev_var_values <- seq(0.0, 0.15, 0.03)
+percent_B <- seq(0, 1, 0.2)
+percent_C <- seq(0, 1, 0.2)
+std_dev_values <- seq(5, 20, 5)
+std_dev_var_values <- seq(0.0, 0.15, 0.05)
 
 ### Fit
 
