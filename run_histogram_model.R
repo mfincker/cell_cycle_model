@@ -3,6 +3,9 @@
 # first argument should be the full path to the histo.tsv file
 # ! Update path the Histogram_model.Rmd if running on a different computer.
 
+library(tidyverse)
+library(stringr)
+
 args = commandArgs(trailingOnly = TRUE)
 
 if (length(args) == 0) {
@@ -11,9 +14,10 @@ if (length(args) == 0) {
        call. = FALSE)
 }
 
-out_name = hist_file %>% str_replace("tsv", "fits")
-
 histo_file = args[1]
-rmarkdown::render("/Users/maeva/Research/cell_cycle/FACS analysis/cell_cycle_model/Histogram_model.Rmd",
+
+out_name = histo_file %>% str_replace("tsv", "fits")
+
+rmarkdown::render("/scratch/users/mfincker/cell_cycle_model/Histogram_model.Rmd",
                   output_file = out_file,
                   params = list(histo_file = histo_file))
