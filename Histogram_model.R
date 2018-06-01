@@ -13,6 +13,18 @@
 library(tidyverse)
 library(stringr)
 
+## HISTOGRAM FILE
+
+args = commandArgs(trailingOnly = TRUE)
+
+if (length(args) == 0) {
+  stop(paste("Supply the full path to the histo file.\n",
+             "Usage: Rscript --vanilla run_histogram_model.R <full input file path>"),
+       call. = FALSE)
+}
+
+histo_file = args[1]
+
 ## CONSTANTS
 
 chr_size <- 1.3
@@ -148,14 +160,14 @@ DNAhisto_currentGeneration <-
 ### Loading histogram
 
 histo_raw <- 
-  params$histo_file %>% 
+  histo_file %>% 
   read_tsv()
 
 
-write(params$histo_file, stdout())
+write(histo_file, stdout())
 
 curr_reactor <- 
-  params$histo_file %>% 
+  histo_file %>% 
   str_match("\\/(.)_rep") %>% 
   .[2]
 
@@ -175,7 +187,7 @@ std_dev_var_values <- seq(0.0, 0.15, 0.03)
 
 fits <- tribble(~B, ~C, ~Std_dev, ~Std_dev_var, ~Deviation)
 
-fits_filename <- params$histo_file %>% str_replace("tsv", "fits")
+fits_filename <- histo_file %>% str_replace("tsv", "fits")
 
 i <- 0
 
@@ -231,7 +243,7 @@ best_fit <-
   top_n(n = -1, wt = Deviation)
 
 best_fit_plotname <-
-  params$histo_file %>% 
+  histo_file %>% 
   str_replace("tsv", "best_fit.png")
 
 
