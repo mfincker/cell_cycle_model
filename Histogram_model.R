@@ -23,7 +23,7 @@ if (length(args) == 0) {
        call. = FALSE)
 }
 
-histo_file = args[1]
+histo_file <- args[1]
 
 ## CONSTANTS
 
@@ -32,6 +32,10 @@ chr_size <- 1.3
 doubling_times <- #doubling times in days
   tibble(reactor = c("A", "Z", "M", "R"),
          doubling_time = c(12.1, 38.8, 48.5, 23.1))
+
+# ## TEST
+# 
+# histo_file <- "/Users/maeva/Research/FACS/carmen-20180405/analysis/A_rep1_sample9_pico_rnase1_histo.tsv"
 
 
 ## FUNCTIONS 
@@ -45,7 +49,7 @@ getC1 <- function(data_binned) {
     top_n(5, count) %>% 
     .$n %>% 
     mean() %>% 
-    round()
+    round() - 1
   
   return(c1_bin)
 }
@@ -84,7 +88,7 @@ pop_percent <- function(t1, t2, t_total) {
 ### DNA histogram model for replication in current generation (slow growth)
 
 DNAhisto_currentGeneration <- 
-  function(histo, B, C, tau, std_dev, std_dev_var, chr_size, plot = FALSE, filename = "") {
+  function(histo, B, C, tau, std_dev, std_dev_var, chr_size, plot = FALSE, filename = NULL) {
     # Input is :
     #       - B: duration of B phase
     #       - C: duration of C phase
@@ -132,7 +136,7 @@ DNAhisto_currentGeneration <-
     deviation <- 
       histo %>% 
       mutate(dif = (sqrt(count) - sqrt(count_model))^2) %>% 
-      # filter(n > 0.5 * c1_peak) %>% # ignore the debris / cells without full DNA
+      dplyr::filter(n > 0.5 * c1_peak) %>% # ignore the debris / cells without full DNA
       transmute(dif = dif) %>% 
       sum() %>% 
       sqrt(.) / 255
@@ -144,13 +148,16 @@ DNAhisto_currentGeneration <-
         geom_line(aes(y = count), color = "red") +
         geom_line(aes(y = count_model), color = "blue") +
         annotate("text", x = 2.3, y = max(0.9 * histo$count), 
-                 label = stringr::str_c("Cell cycle (in days)\nB: ", B,
+                 label = stringr::str_c("Cell cycle (in days)\nB: ", formatC(B, digits = 2, format = "f"),
                                         "\nC: ", formatC(C, digits = 2, format = "f"),
                                         "\nD: ", formatC((tau - C - B), digits = 2, format = "f"),
                                         "\ndeviation: ", formatC(deviation, digits = 2, format = "f"))) +
         labs(x = "DNA content")
-      
-      ggsave(p, filename = filename)
+      if (!is.null(filename)) {
+        ggsave(p, filename = filename)
+      } else {
+        p
+      }
       
     } else {
       return(tribble(~B, ~C, ~Std_dev, ~Std_dev_var, ~Deviation,
@@ -182,10 +189,10 @@ curr_tau <-
 
 ### Parameter grid search
 
-percent_B <- seq(0, 1, 0.2)
-percent_C <- seq(0, 1, 0.2)
-std_dev_values <- seq(5, 20, 5)
-std_dev_var_values <- seq(0.0, 0.15, 0.05)
+percent_B <- seq(0, 1, 0.05)
+percent_C <- seq(0, 1, 0.05)
+std_dev_values <- seq(5, 20, 1)
+std_dev_var_values <- seq(0.0, 0.15, 0.01)
 
 ### Fit
 
@@ -260,3 +267,15 @@ DNAhisto_currentGeneration(histo_raw,
                            chr_size = chr_size, 
                            plot = TRUE,
                            filename = best_fit_plotname)
+
+
+# ## TEST
+# 
+# DNAhisto_currentGeneration(histo_raw, 
+#                            B = 0.65 * curr_tau, 
+#                            C = 0.2 * curr_tau, 
+#                            tau = curr_tau, 
+#                            std_dev = 15, 
+#                            std_dev_var = 0.09, 
+#                            chr_size = chr_size,
+#                            plot = TRUE)
