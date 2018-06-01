@@ -96,13 +96,13 @@ DNAhisto_currentGeneration <-
     #       - plot: should the function plot the model (default: FALSE)
     #       - filename: output file name (default: '')
     
-    if ( B + C > tau) {
-      print(str_c("B: ", B))
-      print(str_c("C: ", C))
-      print("DNA replication didn't start in current generation.")
-      return(tribble(~B, ~C, ~Std_dev, ~Std_dev_var, ~Deviation,
-                      B,  C,  std_dev,  std_dev_var,  NA))
-    }
+    # if ( B + C > tau) {
+    #   print(str_c("B: ", B))
+    #   print(str_c("C: ", C))
+    #   print("DNA replication didn't start in current generation.")
+    #   return(tribble(~B, ~C, ~Std_dev, ~Std_dev_var, ~Deviation,
+    #                   B,  C,  std_dev,  std_dev_var,  NA))
+    # }
     
     c1_peak <- getC1(histo) 
     total_count <- histo$count %>% sum()
@@ -175,7 +175,7 @@ curr_reactor <-
   str_match("\\/(.)_rep") %>% 
   .[2]
 
-tau <- 
+curr_tau <- 
   doubling_times %>% 
   dplyr::filter(reactor == curr_reactor) %>% 
   .$doubling_time
@@ -207,9 +207,9 @@ for (b in percent_B) {
           
           fits <- 
             DNAhisto_currentGeneration(histo_raw, 
-                                       B = b * tau, 
-                                       C = c * tau, 
-                                       tau = tau, 
+                                       B = b * curr_tau, 
+                                       C = c * curr_tau, 
+                                       tau = curr_tau, 
                                        std_dev = std_dev, 
                                        std_dev_var = std_dev_var, 
                                        chr_size = chr_size) %>% 
@@ -254,7 +254,7 @@ best_fit_plotname <-
 DNAhisto_currentGeneration(histo_raw,
                            B = best_fit$B, 
                            C = best_fit$C, 
-                           tau = tau, 
+                           tau = curr_tau, 
                            std_dev = best_fit$Std_dev, 
                            std_dev_var = best_fit$Std_dev_var, 
                            chr_size = chr_size, 
