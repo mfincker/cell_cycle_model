@@ -185,7 +185,7 @@ DNAhisto_currentGeneration <-
     
     print(histo %>% summarise_all(sum))
     
-    std_dev with incremental change
+    #std_dev with incremental change
     histo <-
       histo %>%
       mutate(std_dev = std_dev + std_dev_var * min(max(0, row_number() - c1_peak), c2_peak),
@@ -249,14 +249,14 @@ DNAhisto_currentGeneration <-
   }
 
 ### TEST 
-DNAhisto_currentGeneration(histo_test,
-                           B = 26, 
-                           C = 16, 
-                           tau = curr_tau, 
-                           std_dev = 17, 
-                           std_dev_var = 0.009, 
-                           chr_size = chr_size, 
-                           plot = TRUE)
+# DNAhisto_currentGeneration(histo_test,
+#                            B = 26, 
+#                            C = 16, 
+#                            tau = curr_tau, 
+#                            std_dev = 17, 
+#                            std_dev_var = 0.009, 
+#                            chr_size = chr_size, 
+#                            plot = TRUE)
 ## MODEL FITTING
 
 ### Loading histogram
@@ -356,13 +356,14 @@ best_fit_plotname <-
 
 
 DNAhisto_currentGeneration(histo_raw,
-                           B = 25, 
-                           C = 20, 
+                           B = best_fit$B, 
+                           C = best_fit$C, 
                            tau = curr_tau, 
-                           std_dev = 8, 
-                           std_dev_var = 0.1, 
+                           std_dev = best_fit$Std_dev, 
+                           std_dev_var = best_fit$Std_dev_var, 
                            chr_size = chr_size, 
-                           plot = TRUE)
+                           plot = TRUE,
+                           filename = best_fit_plotname)
 
 
 # ## TEST
