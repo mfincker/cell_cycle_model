@@ -215,9 +215,12 @@ DNAhisto_currentGeneration <-
       # filter(n > 0.5 * c1_peak) %>% # ignore the debris / cells without full DNA
       filter(n < 1.25 * c2_peak, n > 0.25 * c1_peak) %>%
       transmute(dif = dif) %>%
-      sum() %>%
+      .$dif %>% 
+      mean() %>% 
+      sqrt()
+      # sum() %>%
       # sqrt(.) / 255
-      sqrt(.) / round(1.25 * c2_peak - 0.25 * c1_peak)
+      # sqrt(.) / round(1.25 * c2_peak - 0.25 * c1_peak)
 
     if (plot == TRUE) {
 
@@ -237,7 +240,8 @@ DNAhisto_currentGeneration <-
                                 ", D: ", tau - B - C,
                                 ", tau: ", tau,
                                 ", std_dev: ", std_dev,
-                                ", std_dev_var: ", std_dev_var))
+                                ", std_dev_var: ", std_dev_var,
+                                " - error: ", formatC(deviation, digits = 2)))
       }
 
 
@@ -249,14 +253,14 @@ DNAhisto_currentGeneration <-
   }
 
 ### TEST 
-# DNAhisto_currentGeneration(histo_test,
-#                            B = 26, 
-#                            C = 16, 
-#                            tau = curr_tau, 
-#                            std_dev = 17, 
-#                            std_dev_var = 0.009, 
-#                            chr_size = chr_size, 
-#                            plot = TRUE)
+DNAhisto_currentGeneration(histo_test,
+                           B = 26,
+                           C = 16,
+                           tau = curr_tau,
+                           std_dev = 17,
+                           std_dev_var = 0.009,
+                           chr_size = chr_size,
+                           plot = TRUE)
 ## MODEL FITTING
 
 ### Loading histogram
@@ -368,14 +372,14 @@ DNAhisto_currentGeneration(histo_raw,
 
 # ## TEST
 
-# DNAhisto_currentGeneration(histo_raw,
-#                            B = 0.8 * curr_tau,
-#                            C = 0.05 * curr_tau,
-#                            tau = curr_tau,
-#                            std_dev = 17,
-#                            std_dev_var = 0.01,
-#                            chr_size = chr_size,
-#                            plot = TRUE)
+DNAhisto_currentGeneration(histo_raw,
+                           B = 0.15 * curr_tau,
+                           C = 0.55 * curr_tau,
+                           tau = curr_tau,
+                           std_dev = 17,
+                           std_dev_var = 0.03,
+                           chr_size = chr_size,
+                           plot = TRUE)
 
 c1 <- 18100
 histo_raw %>% 
