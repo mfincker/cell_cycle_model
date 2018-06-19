@@ -35,7 +35,7 @@ doubling_times <- #doubling times in days
 
 # ## TEST
 # 
-# histo_file <- "/Users/maeva/Research/FACS/carmen-20180405/analysis/A_rep1_sample9_pico_rnase1_histo.tsv"
+histo_file <- "/Users/maeva/Research/FACS/carmen-20180405/analysis/A_rep1_sample9_pico_rnase1_histo.tsv"
 
 
 ## FUNCTIONS 
@@ -49,7 +49,7 @@ getC1 <- function(data_binned) {
     top_n(5, count) %>% 
     .$n %>% 
     mean() %>% 
-    round() - 1
+    round() + 1
   
   return(c1_bin)
 }
@@ -101,11 +101,7 @@ DNAhisto_currentGeneration <-
     #       - filename: output file name (default: '')
     
     # if ( B + C > tau) {
-    #   print(str_c("B: ", B))
-    #   print(str_c("C: ", C))
-    #   print("DNA replication didn't start in current generation.")
-    #   return(tribble(~B, ~C, ~Std_dev, ~Std_dev_var, ~Deviation,
-    #                   B,  C,  std_dev,  std_dev_var,  NA))
+    #   stop("DNA replication didn't start in current generation.")
     # }
     
     c1_peak <- getC1(histo) 
@@ -124,7 +120,7 @@ DNAhisto_currentGeneration <-
     # std_dev with incremental change
     histo <-
       histo %>% 
-      mutate(std_dev = std_dev + std_dev_var * row_number(),
+      mutate(std_dev = std_dev + std_dev_var * min(max(0, row_number() - c1_peak), c1_peak),
              count_model = map2(n, std_dev, 
                                 function(x, y) {histo$count_theo * dnorm(histo$n, x, y) %>% 
                                     as_tibble}) %>% 
@@ -136,10 +132,12 @@ DNAhisto_currentGeneration <-
     deviation <- 
       histo %>% 
       mutate(dif = (sqrt(count) - sqrt(count_model))^2) %>% 
-      dplyr::filter(n > 0.5 * c1_peak) %>% # ignore the debris / cells without full DNA
+      # filter(n > 0.5 * c1_peak) %>% # ignore the debris / cells without full DNA
+      filter(n < 3 * c1_peak, n > 0.25 * c1_peak) %>% 
       transmute(dif = dif) %>% 
       sum() %>% 
-      sqrt(.) / 255
+      # sqrt(.) / 255
+      sqrt(.) / round(3 * c1_peak - 0.25 * c1_peak)
     
     if (plot == TRUE) {
       
@@ -148,16 +146,23 @@ DNAhisto_currentGeneration <-
         geom_line(aes(y = count), color = "red") +
         geom_line(aes(y = count_model), color = "blue") +
         annotate("text", x = 2.3, y = max(0.9 * histo$count), 
-                 label = stringr::str_c("Cell cycle (in days)\nB: ", formatC(B, digits = 2, format = "f"),
+                 label = stringr::str_c("Cell cycle (in days)\nB: ", B,
                                         "\nC: ", formatC(C, digits = 2, format = "f"),
                                         "\nD: ", formatC((tau - C - B), digits = 2, format = "f"),
                                         "\ndeviation: ", formatC(deviation, digits = 2, format = "f"))) +
         labs(x = "DNA content")
+      
       if (!is.null(filename)) {
         ggsave(p, filename = filename)
       } else {
-        p
+        p + labs(title = str_c( "B: ", B, 
+                                ", C: ", C, 
+                                ", D: ", tau - B - C,
+                                ", tau: ", tau, 
+                                ", std_dev: ", std_dev,
+                                ", std_dev_var: ", std_dev_var))
       }
+      
       
     } else {
       return(tribble(~B, ~C, ~Std_dev, ~Std_dev_var, ~Deviation,
@@ -189,10 +194,10 @@ curr_tau <-
 
 ### Parameter grid search
 
-percent_B <- seq(0, 1, 0.05)
-percent_C <- seq(0, 1, 0.05)
-std_dev_values <- seq(5, 20, 1)
-std_dev_var_values <- seq(0.0, 0.15, 0.01)
+percent_B <- seq(0, 1, 0.02)
+percent_C <- seq(0, 1, 0.02)
+std_dev_values <- seq(15, 19, 1)
+std_dev_var_values <- seq(0.01, 0.05, 0.01)
 
 ### Fit
 
@@ -224,7 +229,7 @@ for (b in percent_B) {
           
           i <- i + 1
           
-          if (i %% 10 == 0) {
+          if (i %% 20 == 0) {
             fits %>% 
               arrange(Deviation) %>% 
               write_tsv(fits_filename, 
@@ -270,12 +275,12 @@ DNAhisto_currentGeneration(histo_raw,
 
 
 # ## TEST
-# 
-# DNAhisto_currentGeneration(histo_raw, 
-#                            B = 0.65 * curr_tau, 
-#                            C = 0.2 * curr_tau, 
-#                            tau = curr_tau, 
-#                            std_dev = 15, 
-#                            std_dev_var = 0.09, 
+
+# DNAhisto_currentGeneration(histo_raw,
+#                            B = 0.8 * curr_tau,
+#                            C = 0.05 * curr_tau,
+#                            tau = curr_tau,
+#                            std_dev = 17,
+#                            std_dev_var = 0.01,
 #                            chr_size = chr_size,
 #                            plot = TRUE)
