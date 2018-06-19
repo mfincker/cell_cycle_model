@@ -35,7 +35,21 @@ doubling_times <- #doubling times in days
 
 # ## TEST
 # 
-# histo_file <- "/Users/maeva/Research/FACS/carmen-20180405/analysis/A_rep1_sample9_pico_rnase1_histo.tsv"
+# histo_file <- "/Users/maeva/Research/FACS/carmen-20180405/model/M_rep1_sample17_pico_rnase1_histo.tsv"
+# fits_file <- str_replace(histo_file, "tsv", "fits")
+# histo_test <- 
+#   histo_file %>% 
+#   read_tsv()
+# 
+# curr_reactor <- 
+#   histo_file %>% 
+#   str_match("\\/(.)_rep") %>% 
+#   .[2]
+# 
+# curr_tau <- 
+#   doubling_times %>% 
+#   dplyr::filter(reactor == curr_reactor) %>% 
+#   .$doubling_time
 
 
 ## FUNCTIONS 
@@ -44,39 +58,84 @@ doubling_times <- #doubling times in days
 
 getC1 <- function(data_binned) {
   # Given a df of binned DNA data (channel ~ count), returns the C1 channel
-  c1_bin <- 
+  c1_pico <- 
     data_binned %>% 
     top_n(5, count) %>% 
-    .$n %>% 
-    mean() %>% 
-    round() + 1
+    .$pico %>% 
+    mean()
   
-  return(c1_bin)
+  c1_bin <- 
+    data_binned %>% 
+    mutate(dif_c1 = abs(pico - c1_pico)) %>% 
+    top_n(n = -1,  wt = dif_c1) %>% 
+    .$n - 1
+  
+  theo_c1_pico <- 
+    data_binned %>% 
+    filter(n == c1_bin) %>% 
+    .$pico
+  
+  c2_bin <- 
+    data_binned %>% 
+    mutate(dif_c2 = abs(pico - 2 * theo_c1_pico)) %>% 
+    top_n(n = -1, wt = dif_c2) %>% 
+    .$n
+  
+  return(list(c1_bin, c2_bin))
 }
+
+#### TEST
+# getC1(histo_test)
+# histo_test %>% 
+#   ggplot(aes(n, count)) +
+#   geom_line() +
+#   geom_vline(xintercept = getC1(histo_test) %>% unlist())
 
 
 ### DNA theoretical distribution
 
 #### Theoretical count in a given channel
 
-theoretical_count <- function(bin, start_bin, B, C, tau, total_n, time_per_channel) {
+theoretical_count <- function(bin, start_bin, end_bin, B, C, tau, total_n, time_per_channel) {
   # Given a c1 channel, B, C, tau and total counts, returns the theoretical counts
   # in a specific channel.
   
-  if (bin < start_bin | bin > 2 * start_bin) {
+  if (bin < start_bin | bin > end_bin) {
     count_theo <- 0
   } else if (bin == start_bin) {
-    count_theo <- total_n * pop_percent(0, B, tau)
-  } else if (bin == 2 * start_bin) {
-    count_theo <- total_n * pop_percent(B + C, tau, tau)
+    count_theo <- total_n * pop_percent(0, B + time_per_channel/2, tau)
+  } else if (bin == end_bin) {
+    count_theo <- total_n * pop_percent(B + C - time_per_channel/2, tau, tau)
   } else {
-    count_theo <- total_n * pop_percent(B + time_per_channel * (bin - start_bin),
-                                        B + time_per_channel * (bin + 1 - start_bin),
-                                        tau) # might be missing a bin during intergration
+    count_theo <- total_n * pop_percent(B + time_per_channel/2 + time_per_channel * (bin - start_bin - 1),
+                                        B + time_per_channel/2 + time_per_channel * (bin - start_bin), 
+                                        tau) 
   }
   
   return(count_theo)
 }
+
+### TEST
+# theoretical_count(11, 10, 12, 0.74, 0.12, 1, 100, 0.12/2)
+# theoretical_count(10, 10, 12, 0.74, 0.12, 1, 100, 0.12/2)
+# theoretical_count(12, 10, 12, 0.74, 0.12, 1, 100, 0.12/2)
+# 
+# theoretical_count(11, 10, 12, 0.74, 0.12, 1, 100, 0.12/2) +
+# theoretical_count(10, 10, 12, 0.74, 0.12, 1, 100, 0.12/2) +
+# theoretical_count(12, 10, 12, 0.74, 0.12, 1, 100, 0.12/2)
+# 
+# theoretical_count(5, 5, 8, 0.74, 0.12, 1, 100, 0.12/3)
+# theoretical_count(6, 5, 8, 0.74, 0.12, 1, 100, 0.12/3)
+# theoretical_count(7, 5, 8, 0.74, 0.12, 1, 100, 0.12/3)
+# theoretical_count(8, 5, 8, 0.74, 0.12, 1, 100, 0.12/3)
+# theoretical_count(4, 5, 8, 0.74, 0.12, 1, 100, 0.12/3)
+# theoretical_count(9, 5, 8, 0.74, 0.12, 1, 100, 0.12/3)
+# 
+# theoretical_count(5, 5, 8, 0.74, 0.12, 1, 100, 0.12/3) +
+# theoretical_count(6, 5, 8, 0.74, 0.12, 1, 100, 0.12/3) +
+# theoretical_count(7, 5, 8, 0.74, 0.12, 1, 100, 0.12/3) +
+# theoretical_count(8, 5, 8, 0.74, 0.12, 1, 100, 0.12/3)
+
 
 #### Percentage of cells in a given time slice
 
@@ -84,6 +143,10 @@ pop_percent <- function(t1, t2, t_total) {
   2 * (2 ^ (-t1 / t_total) - 2 ^ (-t2 / t_total))
 }
 
+### TEST
+# pop_percent(0, 0.74, 1)
+# pop_percent(0.86, 1, 1)
+# pop_percent(0, 1, 1)
 
 ### DNA histogram model for replication in current generation (slow growth)
 
@@ -104,66 +167,80 @@ DNAhisto_currentGeneration <-
     #   stop("DNA replication didn't start in current generation.")
     # }
     
-    c1_peak <- getC1(histo) 
+    peaks <- getC1(histo)
+    c1_peak <- peaks[[1]]
+    c2_peak <- peaks[[2]]
     total_count <- histo$count %>% sum()
-    dna_per_bin <- chr_size / c1_peak
-    start_bin <- chr_size / dna_per_bin
-    time_per_channel <- C / start_bin
-    
+
+    start_bin <- c1_peak
+    end_bin <- c2_peak
+    time_per_channel <- C / (end_bin - start_bin)
+
     
     histo <-
       histo %>%
       mutate(count_theo = map_dbl(n, 
-                                  ~theoretical_count(., start_bin, B, C, tau, total_count, time_per_channel))
+                                  ~theoretical_count(., start_bin, end_bin, B, C, tau, total_count, time_per_channel))
       )
     
-    # std_dev with incremental change
+    print(histo %>% summarise_all(sum))
+    
+    std_dev with incremental change
     histo <-
-      histo %>% 
-      mutate(std_dev = std_dev + std_dev_var * min(max(0, row_number() - c1_peak), c1_peak),
-             count_model = map2(n, std_dev, 
-                                function(x, y) {histo$count_theo * dnorm(histo$n, x, y) %>% 
-                                    as_tibble}) %>% 
-               bind_cols() %>% 
-               summarise_all(sum) %>% 
-               gather(key = x, value = y) %>% 
+      histo %>%
+      mutate(std_dev = std_dev + std_dev_var * min(max(0, row_number() - c1_peak), c2_peak),
+             count_model = map2(n, std_dev,
+                                function(x, y) {histo$count_theo * dnorm(histo$n, x, y) %>%
+                                    as_tibble}) %>%
+               bind_cols() %>%
+               summarise_all(sum) %>%
+               gather(key = x, value = y) %>%
                .$y)
     
-    deviation <- 
-      histo %>% 
-      mutate(dif = (sqrt(count) - sqrt(count_model))^2) %>% 
+    # # std_dev as 5% CV of the mean
+    # histo <-
+    #   histo %>%
+    #   mutate(std_dev = 0.20 * n,
+    #          count_model = map2(n, std_dev,
+    #                             function(x, y) {histo$count_theo * dnorm(histo$n, x, y) %>%
+    #                                 as_tibble}) %>%
+    #            bind_cols() %>%
+    #            summarise_all(sum) %>%
+    #            gather(key = x, value = y) %>%
+    #            .$y)
+
+    deviation <-
+      histo %>%
+      mutate(dif = (sqrt(count) - sqrt(count_model))^2) %>%
       # filter(n > 0.5 * c1_peak) %>% # ignore the debris / cells without full DNA
-      filter(n < 3 * c1_peak, n > 0.25 * c1_peak) %>% 
-      transmute(dif = dif) %>% 
-      sum() %>% 
+      filter(n < 1.25 * c2_peak, n > 0.25 * c1_peak) %>%
+      transmute(dif = dif) %>%
+      sum() %>%
       # sqrt(.) / 255
-      sqrt(.) / round(3 * c1_peak - 0.25 * c1_peak)
-    
+      sqrt(.) / round(1.25 * c2_peak - 0.25 * c1_peak)
+
     if (plot == TRUE) {
-      
-      p <- histo %>% 
-        ggplot(aes(x = n / c1_peak)) +
+
+      p <- histo %>%
+        ggplot(aes(x = (n + c2_peak - 2*c1_peak) / (c2_peak - c1_peak))) +
         geom_line(aes(y = count), color = "red") +
         geom_line(aes(y = count_model), color = "blue") +
-        annotate("text", x = 2.3, y = max(0.9 * histo$count), 
-                 label = stringr::str_c("Cell cycle (in days)\nB: ", B,
-                                        "\nC: ", formatC(C, digits = 2, format = "f"),
-                                        "\nD: ", formatC((tau - C - B), digits = 2, format = "f"),
-                                        "\ndeviation: ", formatC(deviation, digits = 2, format = "f"))) +
+        # geom_line(aes(y = count_theo), color = "black") +
+        # geom_vline(xintercept = 1:2, color = "black") +
         labs(x = "DNA content")
-      
+
       if (!is.null(filename)) {
         ggsave(p, filename = filename)
       } else {
-        p + labs(title = str_c( "B: ", B, 
-                                ", C: ", C, 
+        p + labs(title = str_c( "B: ", B,
+                                ", C: ", C,
                                 ", D: ", tau - B - C,
-                                ", tau: ", tau, 
+                                ", tau: ", tau,
                                 ", std_dev: ", std_dev,
                                 ", std_dev_var: ", std_dev_var))
       }
-      
-      
+
+
     } else {
       return(tribble(~B, ~C, ~Std_dev, ~Std_dev_var, ~Deviation,
                      B,   C,  std_dev,  std_dev_var,  deviation))
@@ -171,6 +248,15 @@ DNAhisto_currentGeneration <-
     
   }
 
+### TEST 
+DNAhisto_currentGeneration(histo_test,
+                           B = 26, 
+                           C = 16, 
+                           tau = curr_tau, 
+                           std_dev = 17, 
+                           std_dev_var = 0.009, 
+                           chr_size = chr_size, 
+                           plot = TRUE)
 ## MODEL FITTING
 
 ### Loading histogram
@@ -248,15 +334,21 @@ for (b in percent_B) {
 ### Best fit
 
 # Reload all fits
+# all_fits <- 
+#   fits_filename %>% 
+#   read_tsv(col_names = c("B", "C", "Std_dev", "Std_dev_var", "Deviation"))
+
 all_fits <- 
-  fits_filename %>% 
-  read_tsv(col_names = c("B", "C", "Std_dev", "Std_dev_var", "Deviation"))
+  fits_file %>% 
+  read_tsv(col_names = c("B", "C", "Std_dev", "Std_dev_var", "Deviation"),
+          col_types = "ddidd")
 
 
 # Plot best fit
 best_fit <- 
   all_fits %>% 
-  top_n(n = -1, wt = Deviation)
+  filter(B != 0, C != 0) %>% 
+  top_n(n = -50, wt = Deviation)
 
 best_fit_plotname <-
   histo_file %>% 
@@ -264,14 +356,13 @@ best_fit_plotname <-
 
 
 DNAhisto_currentGeneration(histo_raw,
-                           B = best_fit$B, 
-                           C = best_fit$C, 
+                           B = 25, 
+                           C = 20, 
                            tau = curr_tau, 
-                           std_dev = best_fit$Std_dev, 
-                           std_dev_var = best_fit$Std_dev_var, 
+                           std_dev = 8, 
+                           std_dev_var = 0.1, 
                            chr_size = chr_size, 
-                           plot = TRUE,
-                           filename = best_fit_plotname)
+                           plot = TRUE)
 
 
 # ## TEST
@@ -284,3 +375,11 @@ DNAhisto_currentGeneration(histo_raw,
 #                            std_dev_var = 0.01,
 #                            chr_size = chr_size,
 #                            plot = TRUE)
+
+c1 <- 18100
+histo_raw %>% 
+  ggplot(aes(pico, count)) + 
+  geom_line() +
+  geom_vline(xintercept = c1, color = "red") +
+  geom_vline(xintercept = 2 * c1, color = "red")
+  
