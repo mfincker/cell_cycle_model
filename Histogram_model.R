@@ -19,7 +19,7 @@ args = commandArgs(trailingOnly = TRUE)
 
 if (length(args) == 0) {
   stop(paste("Supply the full path to the histo file.\n",
-             "Usage: Rscript --vanilla run_histogram_model.R <full input file path>"),
+             "Usage: Rscript --vanilla Histogram_model.R <full input file path>"),
        call. = FALSE)
 }
 
@@ -35,7 +35,7 @@ doubling_times <- #doubling times in days
 
 # ## TEST
 # 
-histo_file <- "/Users/maeva/Research/FACS/carmen-20180405/analysis/A_rep1_sample9_pico_rnase1_histo.tsv"
+# histo_file <- "/Users/maeva/Research/FACS/carmen-20180405/analysis/A_rep1_sample9_pico_rnase1_histo.tsv"
 
 
 ## FUNCTIONS 
