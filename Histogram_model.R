@@ -253,14 +253,15 @@ DNAhisto_currentGeneration <-
   }
 
 ### TEST 
-DNAhisto_currentGeneration(histo_test,
-                           B = 26,
-                           C = 16,
-                           tau = curr_tau,
-                           std_dev = 17,
-                           std_dev_var = 0.009,
-                           chr_size = chr_size,
-                           plot = TRUE)
+#DNAhisto_currentGeneration(histo_test,
+#                           B = 26,
+#                           C = 16,
+#                           tau = curr_tau,
+#                          std_dev = 17,
+#                           std_dev_var = 0.009,
+#                           chr_size = chr_size,
+#                           plot = TRUE)
+
 ## MODEL FITTING
 
 ### Loading histogram
@@ -268,7 +269,6 @@ DNAhisto_currentGeneration(histo_test,
 histo_raw <- 
   histo_file %>% 
   read_tsv()
-
 
 write(histo_file, stdout())
 
@@ -284,10 +284,10 @@ curr_tau <-
 
 ### Parameter grid search
 
-percent_B <- seq(0, 1, 0.02)
-percent_C <- seq(0, 1, 0.02)
-std_dev_values <- seq(15, 19, 1)
-std_dev_var_values <- seq(0.01, 0.05, 0.01)
+percent_B <- seq(0.55, 0.99, 0.01)
+percent_C <- seq(0.01, 0.45, 0.01)
+std_dev_values <- seq(15, 19, 0.5)
+std_dev_var_values <- seq(0.0, 0.05, 0.002)
 
 ### Fit
 
@@ -338,14 +338,10 @@ for (b in percent_B) {
 ### Best fit
 
 # Reload all fits
-# all_fits <- 
-#   fits_filename %>% 
-#   read_tsv(col_names = c("B", "C", "Std_dev", "Std_dev_var", "Deviation"))
-
 all_fits <- 
-  fits_file %>% 
-  read_tsv(col_names = c("B", "C", "Std_dev", "Std_dev_var", "Deviation"),
-          col_types = "ddidd")
+   fits_filename %>% 
+   read_tsv(col_names = c("B", "C", "Std_dev", "Std_dev_var", "Deviation"),
+	    col_types = "ddidd")
 
 
 # Plot best fit
@@ -372,19 +368,19 @@ DNAhisto_currentGeneration(histo_raw,
 
 # ## TEST
 
-DNAhisto_currentGeneration(histo_raw,
-                           B = 0.15 * curr_tau,
-                           C = 0.55 * curr_tau,
-                           tau = curr_tau,
-                           std_dev = 17,
-                           std_dev_var = 0.03,
-                           chr_size = chr_size,
-                           plot = TRUE)
+#DNAhisto_currentGeneration(histo_raw,
+#                           B = 0.15 * curr_tau,
+#                           C = 0.55 * curr_tau,
+#                           tau = curr_tau,
+#                           std_dev = 17,
+#                           std_dev_var = 0.03,
+#                           chr_size = chr_size,
+#                           plot = TRUE)
 
-c1 <- 18100
-histo_raw %>% 
-  ggplot(aes(pico, count)) + 
-  geom_line() +
-  geom_vline(xintercept = c1, color = "red") +
-  geom_vline(xintercept = 2 * c1, color = "red")
+#c1 <- 18100
+#histo_raw %>% 
+#  ggplot(aes(pico, count)) + 
+#  geom_line() +
+#  geom_vline(xintercept = c1, color = "red") +
+#  geom_vline(xintercept = 2 * c1, color = "red")
   
